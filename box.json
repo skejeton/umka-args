@@ -7,7 +7,7 @@
 	"readme": "README.md",
 	"dependencies": [],
 	"include": ["args.um"],
-	"homepage": "umbox.tophat2d.dev/package/args",
+	"homepage": "https://umbox.tophat2d.dev/package/args",
 	"source": "https://github.com/skejeton/umka-args",
 	"run": "umka example.um"
 }
