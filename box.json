@@ -1,6 +1,6 @@
 {
 	"name": "args",
-	"version": "v0.2.0",
+	"version": "v0.3.0",
 	"author": "skejeton <contact@ske.land>",
 	"license": "CC0/MIT",
 	"description": "A simple argument parsing library.",
