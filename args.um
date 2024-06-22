@@ -14,6 +14,7 @@ type (
         value: any
         required: bool
         occurences: int
+        positional: bool
     }
 
     Error* = struct {
@@ -25,8 +26,10 @@ type (
         programVer: str
         programDesc: str
         sourceArgs: []str
-        args: []Arg
+        args: []^Arg
         modes: []Mode
+        positional: []^Arg
+        listPositional: ^Arg
         gethelp: bool
     }
 )
@@ -137,8 +140,12 @@ fn mk*(programName: str, programVer: str, programDesc: str, args: []str): Args {
 // Returns true if you are in that mode.
 fn (args: ^Args) mode*(name: str, desc: str = ""): bool {
 //~~
-    args.modes = append(args.modes, Mode{name: name, desc: desc})
+    if len(args.positional) > 0 || args.listPositional != null {
+        std::assert(false, "Cannot use mode after positional arguments")
+    }
 
+    args.modes = append(args.modes, Mode{name: name, desc: desc})
+    
     if len(args.sourceArgs) == 0 {
         return false
     }
@@ -152,18 +159,55 @@ fn (args: ^Args) mode*(name: str, desc: str = ""): bool {
     return false
 }
 
+fn (args: ^Args) arg(name: str, ptr: any, desc: str, required: bool, next: bool) {
+    arg := &Arg{name: name, desc: desc, value: ptr, required: required, positional: next}
+    args.args = append(args.args, arg)
+    
+    if next {
+        if v := ^bool(ptr); v != null {
+            std::assert(false, "Cannot use bool as positional argument")
+        }
+        if args.listPositional != null {
+            std::assert(false, "Cannot put a positional argument after a list positional argument")
+        }
+        if required && len(args.positional) > 0 && !args.positional[len(args.positional) - 1].required {
+            std::assert(false, "Cannot use a required positional argument after optional positional argument")
+        }
+        
+        if isarrtype(ptr) {
+            args.listPositional = arg
+        } else  {
+            args.positional = append(args.positional, arg)
+        }
+    }
+}
+
 //~~fn args.required
 // Adds a required argument to the argument parser.
 fn (args: ^Args) required*(name: str, ptr: any, desc: str = "") {
 //~~
-    args.args = append(args.args, Arg{name: name, desc: desc, value: ptr, required: true})
+    args.arg(name, ptr, desc, true, false)
 }
 
 //~~fn args.optional
 // Adds an optional argument to the argument parser.
 fn (args: ^Args) optional*(name: str, ptr: any, desc: str = "") {
 //~~
-    args.args = append(args.args, Arg{name: name, desc: desc, value: ptr, required: false})
+    args.arg(name, ptr, desc, false, false)
+}
+
+//~~fn args.required
+// Adds a positional required argument to the argument parser.
+fn (args: ^Args) requiredNext*(name: str, ptr: any, desc: str = "") {
+//~~
+    args.arg(name, ptr, desc, true, true)
+}
+
+//~~fn args.optional
+// Adds a positional optional argument to the argument parser.
+fn (args: ^Args) optionalNext*(name: str, ptr: any, desc: str = "") {
+//~~
+    args.arg(name, ptr, desc, false, true)
 }
 
 //~~fn args.help
@@ -173,6 +217,111 @@ fn (args: ^Args) help*() {
     args.optional("help", &args.gethelp, "Show this help message")
 }
 
+fn (arg: ^Arg) parsearg(argv: []str, i: int, errors: ^[]Error): int {
+    arg.occurences += 1
+    if v := ^bool(arg.value); v != null {
+        v ^= !(v^)
+        return i
+    }
+
+    key := ""
+
+    if ismaptype(arg.value) {
+        if i >= len(argv) {
+            errors ^= append(errors^, Error{"Missing key for argument --" + arg.name})
+            return i
+        }
+        key = argv[i]
+        i++
+    }
+
+    if v := ^map[str]bool(arg.value); v != null {
+        v[key] = true
+        return i 
+    }
+
+    if i >= len(argv) {
+        errors ^= append(errors^, Error{"Missing value for argument --" + arg.name})
+        return i
+    }
+
+    // validate first
+    isvalid := false
+    expected := ""
+
+    switch v := type(arg.value) {
+        case ^str: expected = "string"; isvalid = true
+        case ^real: expected = "real number"; isvalid = realstart(argv[i])
+        case ^real32: expected = "real number"; isvalid = realstart(argv[i])
+        case ^int: expected = "integer"; isvalid = intstart(argv[i])
+        case ^int32: expected = "integer"; isvalid = intstart(argv[i])
+        case ^uint: expected = "unsigned integer"; isvalid = uintstart(argv[i])
+        case ^uint32: expected = "unsigned integer"; isvalid = uintstart(argv[i])
+        case ^[]str: expected = "string"; isvalid = true
+        case ^[]real: expected = "real number"; isvalid = realstart(argv[i])
+        case ^[]real32: expected = "real number"; isvalid = realstart(argv[i])
+        case ^[]int: expected = "integer"; isvalid = intstart(argv[i])
+        case ^[]int32: expected = "integer"; isvalid = intstart(argv[i])
+        case ^[]uint: expected = "unsigned integer"; isvalid = uintstart(argv[i])
+        case ^[]uint32: expected = "unsigned integer"; isvalid = uintstart(argv[i])
+        case ^map[str]str: expected = "string"; isvalid = true
+        case ^map[str]real: expected = "real number"; isvalid = realstart(argv[i])
+        case ^map[str]real32: expected = "real number"; isvalid = realstart(argv[i])
+        case ^map[str]int: expected = "integer"; isvalid = intstart(argv[i])
+        case ^map[str]int32: expected = "integer"; isvalid = intstart(argv[i])
+        case ^map[str]uint: expected = "unsigned integer"; isvalid = uintstart(argv[i])
+        case ^map[str]uint32: expected = "unsigned integer"; isvalid = uintstart(argv[i])
+        case ^map[str][]str: expected = "string"; isvalid = true
+        case ^map[str][]real: expected = "real number"; isvalid = realstart(argv[i])
+        case ^map[str][]real32: expected = "real number"; isvalid = realstart(argv[i])
+        case ^map[str][]int: expected = "integer"; isvalid = intstart(argv[i])
+        case ^map[str][]int32: expected = "integer"; isvalid = intstart(argv[i])
+        case ^map[str][]uint: expected = "unsigned integer"; isvalid = uintstart(argv[i])
+        case ^map[str][]uint32: expected = "unsigned integer"; isvalid = uintstart(argv[i])
+        default: std::assert(false, "Unsupported argument type")
+    }
+
+    if !isvalid {
+        errors ^= append(errors^, Error{"Expected "+expected+" for --"+arg.name})
+    }
+
+    switch v := type(arg.value) {
+        case ^str: v ^= argv[i]
+        case ^real: v ^= std::atof(argv[i])
+        case ^real32: v ^= std::atof(argv[i])
+        case ^int: v ^= std::atoi(argv[i])
+        case ^int32: v ^= std::atoi(argv[i])
+        case ^uint: v ^= std::atoi(argv[i])
+        case ^uint32: v ^= std::atoi(argv[i])
+        case ^[]real: v ^= append(v^, std::atof(argv[i]))
+        case ^[]real32: v ^= append(v^, std::atof(argv[i]))
+        case ^[]int: v ^= append(v^, std::atoi(argv[i]))
+        case ^[]int32: v ^= append(v^, std::atoi(argv[i]))
+        case ^[]uint: v ^= append(v^, std::atoi(argv[i]))
+        case ^[]uint32: v ^= append(v^, std::atoi(argv[i]))
+        case ^[]str: v ^= append(v^, argv[i])
+        case ^map[str]str: v[key] = argv[i]
+        case ^map[str]real: v[key] = std::atof(argv[i])
+        case ^map[str]real32: v[key] = std::atof(argv[i])
+        case ^map[str]int: v[key] = std::atoi(argv[i])
+        case ^map[str]int32: v[key] = std::atoi(argv[i])
+        case ^map[str]uint: v[key] = std::atoi(argv[i])
+        case ^map[str]uint32: v[key] = std::atoi(argv[i])
+        case ^map[str][]str: v[key] = append(v[key], argv[i])
+        case ^map[str][]real: v[key] = append(v[key], std::atof(argv[i]))
+        case ^map[str][]real32: v[key] = append(v[key], std::atof(argv[i]))
+        case ^map[str][]int: v[key] = append(v[key], std::atoi(argv[i]))
+        case ^map[str][]int32: v[key] = append(v[key], std::atoi(argv[i]))
+        case ^map[str][]uint: v[key] = append(v[key], std::atoi(argv[i]))
+        case ^map[str][]uint32: v[key] = append(v[key], std::atoi(argv[i]))
+        default:
+    }
+
+    i++
+
+    return i
+}
+
 //~~fn args.parse
 // Parses the command line arguments, returns a list of errors.
 fn (args: ^Args) parse*(): []Error {
@@ -180,126 +329,47 @@ fn (args: ^Args) parse*(): []Error {
     errors := []Error{}
     argv := args.sourceArgs
 
+    positionalIndex := 0
     i := 0
-    for i < len(argv); i++ {
+    for i < len(argv) {
         found := false
 
-        for _, arg^ in args.args {
+        for _, arg in args.args {
             if "--"+arg.name == argv[i] {
                 found = true
-                arg.occurences += 1
-                if v := ^bool(arg.value); v != null {
-                    v ^= !(v^)
-                    break
-                }
-
-                key := ""
-
-                if ismaptype(arg.value) {
-                    if i + 1 >= len(argv) {
-                        errors = append(errors, Error{"Missing key for argument --" + arg.name})
-                        break
-                    }
-                    key = argv[i + 1]
-                    i++
-                }
-
-                if v := ^map[str]bool(arg.value); v != null {
-                    v[key] = true
-                    break
-                }
-
-                if i + 1 >= len(argv) {
-                    errors = append(errors, Error{"Missing value for argument --" + arg.name})
-                    break
-                }
                 i++
-
-                // validate first
-                isvalid := false
-                expected := ""
-
-                switch v := type(arg.value) {
-                    case ^str: expected = "string"; isvalid = true
-                    case ^real: expected = "real number"; isvalid = realstart(argv[i])
-                    case ^real32: expected = "real number"; isvalid = realstart(argv[i])
-                    case ^int: expected = "integer"; isvalid = intstart(argv[i])
-                    case ^int32: expected = "integer"; isvalid = intstart(argv[i])
-                    case ^uint: expected = "unsigned integer"; isvalid = uintstart(argv[i])
-                    case ^uint32: expected = "unsigned integer"; isvalid = uintstart(argv[i])
-                    case ^[]str: expected = "string"; isvalid = true
-                    case ^[]real: expected = "real number"; isvalid = realstart(argv[i])
-                    case ^[]real32: expected = "real number"; isvalid = realstart(argv[i])
-                    case ^[]int: expected = "integer"; isvalid = intstart(argv[i])
-                    case ^[]int32: expected = "integer"; isvalid = intstart(argv[i])
-                    case ^[]uint: expected = "unsigned integer"; isvalid = uintstart(argv[i])
-                    case ^[]uint32: expected = "unsigned integer"; isvalid = uintstart(argv[i])
-                    case ^map[str]str: expected = "string"; isvalid = true
-                    case ^map[str]real: expected = "real number"; isvalid = realstart(argv[i])
-                    case ^map[str]real32: expected = "real number"; isvalid = realstart(argv[i])
-                    case ^map[str]int: expected = "integer"; isvalid = intstart(argv[i])
-                    case ^map[str]int32: expected = "integer"; isvalid = intstart(argv[i])
-                    case ^map[str]uint: expected = "unsigned integer"; isvalid = uintstart(argv[i])
-                    case ^map[str]uint32: expected = "unsigned integer"; isvalid = uintstart(argv[i])
-                    case ^map[str][]str: expected = "string"; isvalid = true
-                    case ^map[str][]real: expected = "real number"; isvalid = realstart(argv[i])
-                    case ^map[str][]real32: expected = "real number"; isvalid = realstart(argv[i])
-                    case ^map[str][]int: expected = "integer"; isvalid = intstart(argv[i])
-                    case ^map[str][]int32: expected = "integer"; isvalid = intstart(argv[i])
-                    case ^map[str][]uint: expected = "unsigned integer"; isvalid = uintstart(argv[i])
-                    case ^map[str][]uint32: expected = "unsigned integer"; isvalid = uintstart(argv[i])
-                    default: std::assert(false, "Unsupported argument type")
-                }
-
-                if !isvalid {
-                    errors = append(errors, Error{"Expected "+expected+" for --"+arg.name})
-                }
-
-                switch v := type(arg.value) {
-                    case ^str: v ^= argv[i]
-                    case ^real: v ^= std::atof(argv[i])
-                    case ^real32: v ^= std::atof(argv[i])
-                    case ^int: v ^= std::atoi(argv[i])
-                    case ^int32: v ^= std::atoi(argv[i])
-                    case ^uint: v ^= std::atoi(argv[i])
-                    case ^uint32: v ^= std::atoi(argv[i])
-                    case ^[]real: v ^= append(v^, std::atof(argv[i]))
-                    case ^[]real32: v ^= append(v^, std::atof(argv[i]))
-                    case ^[]int: v ^= append(v^, std::atoi(argv[i]))
-                    case ^[]int32: v ^= append(v^, std::atoi(argv[i]))
-                    case ^[]uint: v ^= append(v^, std::atoi(argv[i]))
-                    case ^[]uint32: v ^= append(v^, std::atoi(argv[i]))
-                    case ^[]str: v ^= append(v^, argv[i])
-                    case ^map[str]str: v[key] = argv[i]
-                    case ^map[str]real: v[key] = std::atof(argv[i])
-                    case ^map[str]real32: v[key] = std::atof(argv[i])
-                    case ^map[str]int: v[key] = std::atoi(argv[i])
-                    case ^map[str]int32: v[key] = std::atoi(argv[i])
-                    case ^map[str]uint: v[key] = std::atoi(argv[i])
-                    case ^map[str]uint32: v[key] = std::atoi(argv[i])
-                    case ^map[str][]str: v[key] = append(v[key], argv[i])
-                    case ^map[str][]real: v[key] = append(v[key], std::atof(argv[i]))
-                    case ^map[str][]real32: v[key] = append(v[key], std::atof(argv[i]))
-                    case ^map[str][]int: v[key] = append(v[key], std::atoi(argv[i]))
-                    case ^map[str][]int32: v[key] = append(v[key], std::atoi(argv[i]))
-                    case ^map[str][]uint: v[key] = append(v[key], std::atoi(argv[i]))
-                    case ^map[str][]uint32: v[key] = append(v[key], std::atoi(argv[i]))
-                    default:
-                }
-
+                i = arg.parsearg(argv, i, &errors)
                 break
             }
         }
 
         if !found {
-            errors = append(errors, Error{"Unknown argument: " + argv[i]})
+            if positionalIndex < len(args.positional) {
+                i = args.positional[positionalIndex].parsearg(argv, i, &errors)
+                positionalIndex++
+            } else if args.listPositional != null {
+                i = args.listPositional.parsearg(argv, i, &errors)
+            } else {
+                errors = append(errors, Error{"Unknown argument: " + argv[i]})
+                i++
+            }
         }
     }
 
     args.sourceArgs = {}
 
+    for i := positionalIndex; i < len(args.positional); i++ {
+        if args.positional[i].required {
+            errors = append(errors, Error{"Missing argument for " + args.positional[i].name})
+        }
+    }
+
+    if args.listPositional.occurences == 0 && args.listPositional.required {
+        errors = append(errors, Error{"Need at least one argument for " + args.listPositional.name})
+    }
+
     for _, arg in args.args {
-        if arg.required && arg.occurences == 0 {
+        if arg.required && arg.occurences == 0 && !arg.positional {
             errors = append(errors, Error{"Missing required argument --" + arg.name})
         }
     }
@@ -311,15 +381,15 @@ fn (args: ^Args) parse*(): []Error {
 // Returns the usage/help message.
 fn (args: ^Args) getusage*(): str {
 //~~
-    result := ""
+    result := sprintf("%s %s - %s\n", args.programName, args.programVer, args.programDesc)
 
     if len(args.args) > 0 {
-        result += sprintf("%s %s - %s\n\nArguments:\n", args.programName, args.programVer, args.programDesc)
+        result += sprintf("\nArguments:\n")
         for _, arg in args.args {
             optstr := "(required)"
             if !arg.required {
                 if v := ^bool(arg.value); v != null {
-                    if v^ == true {
+                    if v^ == true && arg.name != "help" {
                         optstr = "(default: true)"
                     } else {
                         optstr = ""
@@ -339,7 +409,6 @@ fn (args: ^Args) getusage*(): str {
         }
     }
 
-
     if len(args.modes) > 0 {
         result += sprintf("\nModes:\n")
         for _, mode in args.modes {
@@ -351,6 +420,28 @@ fn (args: ^Args) getusage*(): str {
         }
     }
 
+    if len(args.positional) > 0 || args.listPositional != null {
+        if len(args.positional) > 0 {
+            result += "\nFormat:\n\t"
+            for _, arg in args.positional {
+                if arg.required {
+                    result += sprintf("<%s> ", arg.name)
+                } else {
+                    result += sprintf("[%s] ", arg.name)
+                }
+            }
+        }
+
+        if args.listPositional.required {
+            result += sprintf("<%s...>", args.listPositional.name)
+        } else {
+            result += sprintf("[%s...]", args.listPositional.name)
+        }
+
+        result += "\n"
+    }
+
+
     return result
 }
 
@@ -358,11 +449,11 @@ fn (args: ^Args) getusage*(): str {
 // Prints the usage/help message and exits.
 fn (args: ^Args) usage*() {
 //~~
-    printf("%s\n", args.getusage())
+    printf("%s", args.getusage())
 
     for _, arg in args.args {
         if args.gethelp && arg.occurences != 0 && arg.name != "help" {
-            printf("Warning: Argument --%s is ignored", arg.name)
+            printf("\nWarning: Argument to %s is ignored", arg.name)
         }
     }
 

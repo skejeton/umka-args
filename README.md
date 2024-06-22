@@ -61,24 +61,25 @@ fn main() {
 Output:
 
 ```
+W:\umka-extras\args>umka example.um test --help
 Your program 1.0.0 - Here goes description of your program.
 
 Arguments:
-        --help                   - Show this help message (default: true)
+        --help                   - Show this help message
         --boolean                - A simple boolean. (default: true)
         --numeric    <int>       - A simple number. (required)
         --list       <str>       - Appends a number to a list.
         --record     <key> <int> - Sets a key-value pair to a record.
         --classifier <key> <int> - Appends a number to a list of a key.
 
-Modes:
-        special - A special mode
+Format:
+        <numeric> [list...]
 ```
 
 It will gracefully handle the errors for you:
 
 ```
-W:\umka-extras\args>umka example.um special --list
+W:\umka-extras\args>umka example.um test
 Arguments:
         --help                   - Show this help message
         --boolean                - A simple boolean. (default: true)
@@ -90,8 +91,7 @@ Arguments:
 Modes:
         special - A special mode
 
-Error: Missing value for argument --list
-Error: Missing required argument --numeric
+Error: Missing argument for numeric
 ```
 
 And more! Consult documentation for `args.um` for more information.
