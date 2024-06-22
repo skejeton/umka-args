@@ -258,7 +258,20 @@ fn (arg: ^Arg) parsearg(argv: []str, i: int, errors: ^[]Error): int {
             return i
         }
         key = argv[i]
-        i++
+        at := -1
+        for i, c in key {
+            if c == '=' {
+                at = i
+                break
+            }
+        }
+
+        if at != -1 {
+            key = slice(key, 0, at)
+            argv[i] = slice(argv[i], at+1)
+        } else {
+            i++
+        }
     }
 
     if v := ^map[str]bool(arg.value); v != null {
@@ -375,7 +388,7 @@ fn (args: ^Args) parse*(): []Error {
         }
 
         if !found {
-            if argstart(argv[0]) {
+            if argstart(argv[i]) {
                 errors = append(errors, Error{"Unknown argument: " + argv[i]})
                 i++
             } else if positionalIndex < len(args.positional) {
