@@ -15,6 +15,7 @@ type (
         required: bool
         occurences: int
         positional: bool
+        shortname: char
     }
 
     Error* = struct {
@@ -159,7 +160,7 @@ fn (args: ^Args) mode*(name: str, desc: str = ""): bool {
     return false
 }
 
-fn (args: ^Args) arg(name: str, ptr: any, desc: str, required: bool, next: bool) {
+fn (args: ^Args) arg(name: str, ptr: any, desc: str, required: bool, next: bool): ^Arg {
     arg := &Arg{name: name, desc: desc, value: ptr, required: required, positional: next}
     args.args = append(args.args, arg)
     
@@ -180,41 +181,50 @@ fn (args: ^Args) arg(name: str, ptr: any, desc: str, required: bool, next: bool)
             args.positional = append(args.positional, arg)
         }
     }
+
+    return arg
 }
 
 //~~fn args.required
 // Adds a required argument to the argument parser.
-fn (args: ^Args) required*(name: str, ptr: any, desc: str = "") {
+fn (args: ^Args) required*(ptr: any, name: str, desc: str = ""): ^Arg {
 //~~
-    args.arg(name, ptr, desc, true, false)
+    return args.arg(name, ptr, desc, true, false)
 }
 
 //~~fn args.optional
 // Adds an optional argument to the argument parser.
-fn (args: ^Args) optional*(name: str, ptr: any, desc: str = "") {
+fn (args: ^Args) optional*(ptr: any, name: str, desc: str = ""): ^Arg {
 //~~
-    args.arg(name, ptr, desc, false, false)
+    return args.arg(name, ptr, desc, false, false)
 }
 
 //~~fn args.required
 // Adds a positional required argument to the argument parser.
-fn (args: ^Args) requiredNext*(name: str, ptr: any, desc: str = "") {
+fn (args: ^Args) requiredNext*(ptr: any, name: str, desc: str = ""): ^Arg {
 //~~
-    args.arg(name, ptr, desc, true, true)
+    return args.arg(name, ptr, desc, true, true)
 }
 
 //~~fn args.optional
 // Adds a positional optional argument to the argument parser.
-fn (args: ^Args) optionalNext*(name: str, ptr: any, desc: str = "") {
+fn (args: ^Args) optionalNext*(ptr: any, name: str, desc: str = ""): ^Arg {
 //~~
-    args.arg(name, ptr, desc, false, true)
+    return args.arg(name, ptr, desc, false, true)
+}
+
+//~~fn arg.short
+// Adds a short name to the argument.
+fn (arg: ^Arg) short*(ch: char) {
+//~~
+    arg.shortname = ch
 }
 
 //~~fn args.help
 // Adds a --help argument to the argument parser.
 fn (args: ^Args) help*() {
 //~~
-    args.optional("help", &args.gethelp, "Show this help message")
+    args.optional(&args.gethelp, "help", "Show this help message").short('h')
 }
 
 fn (arg: ^Arg) parsearg(argv: []str, i: int, errors: ^[]Error): int {
@@ -340,6 +350,11 @@ fn (args: ^Args) parse*(): []Error {
                 i++
                 i = arg.parsearg(argv, i, &errors)
                 break
+            } else if arg.shortname != '\0' && "-"+arg.shortname == argv[i] {
+                found = true
+                i++
+                i = arg.parsearg(argv, i, &errors)
+                break
             }
         }
 
@@ -384,8 +399,21 @@ fn (args: ^Args) getusage*(): str {
     result := sprintf("%s %s - %s\n", args.programName, args.programVer, args.programDesc)
 
     if len(args.args) > 0 {
+        names := []str{}
+        maxLen := 0
+        for i, arg in args.args {
+            if arg.shortname != '\0' {
+                names = append(names, sprintf("--%s, -%c", arg.name, arg.shortname))
+            } else {
+                names = append(names, sprintf("--%s", arg.name))
+            }
+            if len(names[i]) > maxLen {
+                maxLen = len(names[i])
+            }
+        }
+
         result += sprintf("\nArguments:\n")
-        for _, arg in args.args {
+        for i, arg in args.args {
             optstr := "(required)"
             if !arg.required {
                 if v := ^bool(arg.value); v != null {
@@ -401,10 +429,14 @@ fn (args: ^Args) getusage*(): str {
                 }
             }
 
+            name := names[i]
+
+            for len(name) < maxLen { name += " " }
+
             if arg.desc != "" {
-                result += sprintf("\t--%-10s %-11s - %s %s\n", arg.name, typelbl(arg.value), arg.desc, optstr)
+                result += sprintf("\t%s %-11s - %s %s\n", name, typelbl(arg.value), arg.desc, optstr)
             } else {
-                result += sprintf("\t--%-10s %-11s %s\n", arg.name, typelbl(arg.value), optstr)
+                result += sprintf("\t%s %-11s %s\n", name, typelbl(arg.value), optstr)
             }
         }
     }

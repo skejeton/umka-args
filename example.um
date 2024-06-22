@@ -16,17 +16,18 @@ fn main() {
     // You can also create custom modes.
     if args.mode("test", "Operation mode") {
         // Simple boolean switch.
-        args.optional("boolean", &boolean, "A simple boolean.")
+        // Short flag allows you to use -b instead of --boolean.
+        args.optional(&boolean, "boolean").short('b')
         // A required argument.
         // you can use *Next for positional arguments.
-        args.requiredNext("numeric", &numeric, "A simple number.")
+        args.requiredNext(&numeric, "numeric", "A simple number.")
         // Can insert into a list.
         // Giving a positional argument to a list will span the rest of the arguments.
-        args.optionalNext("list", &list, "Appends a number to a list.")
+        args.optionalNext(&list, "list", "Appends a number to a list.")
         // Can insert into a map.
-        args.optional("record", &record, "Sets a key-value pair to a record.")
+        args.optional(&record, "record", "Sets a key-value pair to a record.").short('r')
         // And can insert into a map of a list.
-        args.optional("classifier", &classifier, "Appends a number to a list of a key.")
+        args.optional(&classifier, "classifier", "Appends a number to a list of a key.")
 
         // Validates the arguments for you.
         // Automatically shows generated help if no mode is specified.

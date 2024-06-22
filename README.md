@@ -65,11 +65,11 @@ W:\umka-extras\args>umka example.um test --help
 Your program 1.0.0 - Here goes description of your program.
 
 Arguments:
-        --help                   - Show this help message
-        --boolean                - A simple boolean. (default: true)
+        --help -h                   - Show this help message
+        --boolean -b                (default: true)
         --numeric    <int>       - A simple number. (required)
         --list       <str>       - Appends a number to a list.
-        --record     <key> <int> - Sets a key-value pair to a record.
+        --record -r  <key> <int> - Sets a key-value pair to a record.
         --classifier <key> <int> - Appends a number to a list of a key.
 
 Format:
@@ -80,16 +80,18 @@ It will gracefully handle the errors for you:
 
 ```
 W:\umka-extras\args>umka example.um test
+Your program 1.0.0 - Here goes description of your program.
+
 Arguments:
-        --help                   - Show this help message
-        --boolean                - A simple boolean. (default: true)
+        --help -h                   - Show this help message
+        --boolean -b                (default: true)
         --numeric    <int>       - A simple number. (required)
         --list       <str>       - Appends a number to a list.
-        --record     <key> <int> - Sets a key-value pair to a record.
+        --record -r  <key> <int> - Sets a key-value pair to a record.
         --classifier <key> <int> - Appends a number to a list of a key.
 
-Modes:
-        special - A special mode
+Format:
+        <numeric> [list...]
 
 Error: Missing argument for numeric
 ```
@@ -100,8 +102,13 @@ And more! Consult documentation for `args.um` for more information.
 
 - Easy to use.
 - Automatically generates usage based on the configuration.
-- Works on various types automatically.
-- Built-in help flag.
 - Validates the arguments for you, shows you the exact errors.
-- Support for modes.
+- Short argument syntax.
+- Positional arguments and list positional arguments.
+- Built-in help flag.
+- Supports for modes (commands).
+- Works on various types:
+        * Booleans/Strings/Integers/Floats(Reals)
+        * Maps (of Booleans/Strings/Integers/Floats(Reals)/Arrays)
+        * Arrays (of Booleans/Strings/Integers/Floats(Reals))
 - Has a more complex API, if needed.
