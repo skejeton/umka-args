@@ -1,0 +1,13 @@
+{
+	"name": "args",
+	"version": "v0.1.0",
+	"author": "skejeton <contact@ske.land>",
+	"license": "CC0/MIT",
+	"description": "A simple argument parsing library.",
+	"readme": "README.md",
+	"dependencies": [],
+	"include": ["args.um"],
+	"homepage": "umbox.tophat2d.dev/package/args",
+	"source": "https://github.com/skejeton/umka-args",
+	"run": "umka example.um"
+}
