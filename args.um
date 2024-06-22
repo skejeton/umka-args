@@ -28,7 +28,6 @@ type (
         modePtr: any
         modes: []Mode
         args: []Arg
-        errors: []Error
         gethelp: bool
         gethelpbydefault: bool
     }
@@ -166,11 +165,11 @@ fn (args: ^Args) help*(bydefault: bool = false) {
 }
 
 //~~fn args.parse
-// Parses the command line arguments.
+// Parses the command line arguments, returns a list of errors.
 // Tip: Use `args::stdargv()` to get the arguments from the command line.
-fn (args: ^Args) parse*(argv: []str): bool {
+fn (args: ^Args) parse*(argv: []str): []Error {
 //~~
-    args.errors = {}
+    errors := []Error{}
 
     argv = slice(argv, 1)
 
@@ -208,7 +207,7 @@ fn (args: ^Args) parse*(argv: []str): bool {
 
                 if ismaptype(arg.value) {
                     if i + 1 >= len(argv) {
-                        args.errors = append(args.errors, Error{"Missing key for argument --" + arg.name})
+                        errors = append(errors, Error{"Missing key for argument --" + arg.name})
                         break
                     }
                     key = argv[i + 1]
@@ -221,7 +220,7 @@ fn (args: ^Args) parse*(argv: []str): bool {
                 }
 
                 if i + 1 >= len(argv) {
-                    args.errors = append(args.errors, Error{"Missing value for argument --" + arg.name})
+                    errors = append(errors, Error{"Missing value for argument --" + arg.name})
                     break
                 }
                 i++
@@ -263,7 +262,7 @@ fn (args: ^Args) parse*(argv: []str): bool {
                 }
 
                 if !isvalid {
-                    args.errors = append(args.errors, Error{"Expected "+expected+" for --"+arg.name})
+                    errors = append(errors, Error{"Expected "+expected+" for --"+arg.name})
                 }
 
                 switch v := type(arg.value) {
@@ -303,17 +302,17 @@ fn (args: ^Args) parse*(argv: []str): bool {
         }
 
         if !found {
-            args.errors = append(args.errors, Error{"Unknown argument: " + argv[i]})
+            errors = append(errors, Error{"Unknown argument: " + argv[i]})
         }
     }
 
     for _, arg in args.args {
         if arg.required && arg.occurences == 0 {
-            args.errors = append(args.errors, Error{"Missing required argument --" + arg.name})
+            errors = append(errors, Error{"Missing required argument --" + arg.name})
         }
     }
 
-    return len(args.errors) == 0
+    return errors
 }
 
 //~~fn args.getusage
@@ -391,13 +390,13 @@ fn stdargv*(): []str {
 // Tip: Use `args::stdargv()` to get the arguments from the command line.
 fn (args: ^Args) check*(argv: []str) {
 //~~
-    ok := args.parse(argv)
+    errors := args.parse(argv)
     if args.gethelp {
         args.usage()
-    } else if !ok {
+    } else if len(errors) > 0 {
         printf("%s", args.getusage())
         printf("\n")
-        for _, error in args.errors {
+        for _, error in errors {
             printf("Error: %s\n", error.msg)
         }
         exit(1)
