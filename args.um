@@ -112,28 +112,28 @@ fn typelbl(v: any): str {
 }
 
 fn argstart(s: str): bool {
-    if s[0] == '-' {
+    if s[0] == '-' && len(s) > 1 {
         return (s[1] >= 'a' && s[1] <= 'z') || (s[1] >= 'A' && s[1] <= 'Z') || s[1] == '_' || s[1] == '-'
     }
     return false
 }
 
 fn realstart(s: str): bool {
-    if s[0] == '-' || s[0] == '+' || s[0] == '.' {
+    if (s[0] == '-' || s[0] == '+' || s[0] == '.') && len(s) > 1 {
         return s[1] >= '0' && s[1] <= '9'
     }
     return s[0] >= '0' && s[0] <= '9'
 }
 
 fn intstart(s: str): bool {
-    if s[0] == '-' || s[0] == '+' {
+    if (s[0] == '-' || s[0] == '+') && len(s) > 1 {
         return s[1] >= '0' && s[1] <= '9'
     }
     return s[0] >= '0' && s[0] <= '9'
 }
 
 fn uintstart(s: str): bool {
-    if s[0] == '+' {
+    if s[0] == '+' && len(s) > 1 {
         return s[1] >= '0' && s[1] <= '9'
     }
     return s[0] >= '0' && s[0] <= '9'
@@ -383,7 +383,7 @@ fn (args: ^Args) parse*(): []Error {
                 positionalIndex++
             } else if args.listPositional != null {
                 i = args.listPositional.parsearg(argv, i, &errors)
-            } else {
+            } else {    
                 errors = append(errors, Error{"Stray argument " + argv[i]})
                 i++
             }
@@ -398,7 +398,7 @@ fn (args: ^Args) parse*(): []Error {
         }
     }
 
-    if args.listPositional.occurences == 0 && args.listPositional.required {
+    if args.listPositional != null && args.listPositional.occurences == 0 && args.listPositional.required {
         errors = append(errors, Error{"Need at least one argument for " + args.listPositional.name})
     }
 
@@ -448,25 +448,38 @@ fn (args: ^Args) getusage*(): str {
                 }
             }
 
-            name := names[i]
-
-            for len(name) < maxLen { name += " " }
+            for len(names[i]) < maxLen {
+                names[i] += " "
+            }
 
             if arg.desc != "" {
-                result += sprintf("\t%s %-11s - %s %s\n", name, typelbl(arg.value), arg.desc, optstr)
+                result += sprintf("\t%s %-11s - %s %s\n", names[i], typelbl(arg.value), arg.desc, optstr)
             } else {
-                result += sprintf("\t%s %-11s %s\n", name, typelbl(arg.value), optstr)
+                result += sprintf("\t%s %-11s %s\n", names[i], typelbl(arg.value), optstr)
             }
         }
     }
 
     if len(args.modes) > 0 {
+        names := []str{}
+        maxLen := 0
+        for i, mode in args.modes {
+            names = append(names, mode.name)
+            if len(names[i]) > maxLen {
+                maxLen = len(names[i])
+            }
+        }
+
         result += sprintf("\nModes:\n")
-        for _, mode in args.modes {
+        for i, mode in args.modes {
+            for len(names[i]) < maxLen {
+                names[i] += " "
+            }
+
             if mode.desc != "" {
-                result += sprintf("\t%s - %s\n", mode.name, mode.desc)
+                result += sprintf("\t%s - %s\n", names[i], mode.desc)
             } else {
-                result += sprintf("\t%s\n", mode.name)
+                result += sprintf("\t%s\n", names[i])
             }
         }
     }
