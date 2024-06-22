@@ -6,7 +6,6 @@ type (
     Mode* = struct {
         name: str
         desc: str
-        value: any
     }
 
     Arg* = struct {
@@ -25,11 +24,10 @@ type (
         programName: str
         programVer: str
         programDesc: str
-        modePtr: any
-        modes: []Mode
+        sourceArgs: []str
         args: []Arg
+        modes: []Mode
         gethelp: bool
-        gethelpbydefault: bool
     }
 )
 
@@ -123,22 +121,35 @@ fn uintstart(s: str): bool {
 
 //~~fn mk
 // Creates a new argument parser.
-fn mk*(programName: str, programVer: str, programDesc: str): Args {
+// Tip: Use `args::stdargv()` to get the arguments from the command line.
+fn mk*(programName: str, programVer: str, programDesc: str, args: []str): Args {
 //~~
     return {
         programName: programName, 
         programVer: programVer,
-        programDesc: programDesc
+        programDesc: programDesc,
+        sourceArgs: slice(args, 1) // skip the program name
     }
 }
 
 //~~fn args.mode
 // Adds a mode to the argument parser.
-fn (args: ^Args) mode*(name: str, ptr: any, value: any, desc: str = "") {
+// Returns true if you are in that mode.
+fn (args: ^Args) mode*(name: str, desc: str = ""): bool {
 //~~
-    std::assert(selftypeeq(ptr, value), "Mode pointer and value must be of the same type");
-    args.modePtr = ptr
-    args.modes = append(args.modes, Mode{name: name, desc: desc, value: value})
+    args.modes = append(args.modes, Mode{name: name, desc: desc})
+
+    if len(args.sourceArgs) == 0 {
+        return false
+    }
+
+    if args.sourceArgs[0] == name {
+        args.modes = {}
+        args.sourceArgs = slice(args.sourceArgs, 1)
+        return true
+    }
+
+    return false
 }
 
 //~~fn args.required
@@ -157,38 +168,17 @@ fn (args: ^Args) optional*(name: str, ptr: any, desc: str = "") {
 
 //~~fn args.help
 // Adds a --help argument to the argument parser.
-// With the argument `bydefault` set to true, the help message will be shown if no mode was selected.
-fn (args: ^Args) help*(bydefault: bool = false) {
+fn (args: ^Args) help*() {
 //~~
-    args.gethelpbydefault = bydefault
     args.optional("help", &args.gethelp, "Show this help message")
 }
 
 //~~fn args.parse
 // Parses the command line arguments, returns a list of errors.
-// Tip: Use `args::stdargv()` to get the arguments from the command line.
-fn (args: ^Args) parse*(argv: []str): []Error {
+fn (args: ^Args) parse*(): []Error {
 //~~
     errors := []Error{}
-
-    argv = slice(argv, 1)
-
-    found := false
-
-    if len(args.modes) > 0 && len(argv) >= 1 {
-        for i, mode in args.modes {
-            if mode.name == argv[0] {
-                args.modePtr = mode.value
-                argv = slice(argv, 1)
-                found = true
-                break
-            }
-        }
-    }
-
-    if !found {
-        args.gethelp = args.gethelpbydefault
-    }
+    argv := args.sourceArgs
 
     i := 0
     for i < len(argv); i++ {
@@ -306,6 +296,8 @@ fn (args: ^Args) parse*(argv: []str): []Error {
         }
     }
 
+    args.sourceArgs = {}
+
     for _, arg in args.args {
         if arg.required && arg.occurences == 0 {
             errors = append(errors, Error{"Missing required argument --" + arg.name})
@@ -321,36 +313,41 @@ fn (args: ^Args) getusage*(): str {
 //~~
     result := ""
 
-    result += sprintf("%s %s - %s\n\nArguments:\n", args.programName, args.programVer, args.programDesc)
-    for _, arg in args.args {
-        optstr := "(required)"
-        if !arg.required {
-            if v := ^bool(arg.value); v != null {
-                if v^ == true {
-                    optstr = "(default: true)"
+    if len(args.args) > 0 {
+        result += sprintf("%s %s - %s\n\nArguments:\n", args.programName, args.programVer, args.programDesc)
+        for _, arg in args.args {
+            optstr := "(required)"
+            if !arg.required {
+                if v := ^bool(arg.value); v != null {
+                    if v^ == true {
+                        optstr = "(default: true)"
+                    } else {
+                        optstr = ""
+                    }
+                } else if !isarrtype(arg.value) && !ismaptype(arg.value) {
+                    optstr = sprintf("(default: %v)", arg.value)
                 } else {
                     optstr = ""
                 }
-            } else if !isarrtype(arg.value) && !ismaptype(arg.value) {
-                optstr = sprintf("(default: %v)", arg.value)
-            } else {
-                optstr = ""
             }
-        }
 
-        if arg.desc != "" {
-            result += sprintf("\t--%-10s %-11s - %s %s\n", arg.name, typelbl(arg.value), arg.desc, optstr)
-        } else {
-            result += sprintf("\t--%-10s %-11s %s\n", arg.name, typelbl(arg.value), optstr)
+            if arg.desc != "" {
+                result += sprintf("\t--%-10s %-11s - %s %s\n", arg.name, typelbl(arg.value), arg.desc, optstr)
+            } else {
+                result += sprintf("\t--%-10s %-11s %s\n", arg.name, typelbl(arg.value), optstr)
+            }
         }
     }
 
-    result += sprintf("\nModes:\n")
-    for _, mode in args.modes {
-        if mode.desc != "" {
-            result += sprintf("\t%s - %s\n", mode.name, mode.desc)
-        } else {
-            result += sprintf("\t%s\n", mode.name)
+
+    if len(args.modes) > 0 {
+        result += sprintf("\nModes:\n")
+        for _, mode in args.modes {
+            if mode.desc != "" {
+                result += sprintf("\t%s - %s\n", mode.name, mode.desc)
+            } else {
+                result += sprintf("\t%s\n", mode.name)
+            }
         }
     }
 
@@ -387,10 +384,9 @@ fn stdargv*(): []str {
 
 //~~fn args.check
 // Parses the command line arguments and exits if there are any errors.
-// Tip: Use `args::stdargv()` to get the arguments from the command line.
-fn (args: ^Args) check*(argv: []str) {
+fn (args: ^Args) check*() {
 //~~
-    errors := args.parse(argv)
+    errors := args.parse()
     if args.gethelp {
         args.usage()
     } else if len(errors) > 0 {
