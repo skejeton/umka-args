@@ -7,6 +7,7 @@ fn main() {
     var numeric: int
     var boolean: bool = true
     var list: []str
+    var cutoff: []str
     var record: map[str]int
     var classifier: map[str][]int
 
@@ -21,13 +22,12 @@ fn main() {
         // A required argument.
         // you can use *Next for positional arguments.
         args.requiredNext(&numeric, "numeric", "A simple number.")
-        // Can insert into a list.
-        // Giving a positional argument to a list will span the rest of the arguments.
-        args.optionalNext(&list, "list", "Appends a number to a list.")
         // Can insert into a map.
         args.optional(&record, "record", "Sets a key-value pair to a record.").short('r')
         // And can insert into a map of a list.
         args.optional(&classifier, "classifier", "Appends a number to a list of a key.")
+        // Cutoff arguments, will be ignored and parsing will stop immediately, useful if you need to pass them to another program.
+        args.requiredCutoff(&cutoff, "cutoff");
 
         // Validates the arguments for you.
         // Automatically shows generated help if no mode is specified.
@@ -39,7 +39,7 @@ fn main() {
         // args.parse, to manually parse and retrieve the errors.
         printf("numeric: %v\n", numeric)
         printf("boolean: %v\n", boolean)
-        printf("list: %v\n", list)
+        printf("cutoff: %v\n", cutoff)
         printf("record: %v\n", record)
         printf("classifier: %v\n", classifier)
     } else {

@@ -20,6 +20,7 @@ fn main() {
     var numeric: int
     var boolean: bool = true
     var list: []str
+    var cutoff: []str
     var record: map[str]int
     var classifier: map[str][]int
 
@@ -34,13 +35,12 @@ fn main() {
         // A required argument.
         // you can use *Next for positional arguments.
         args.requiredNext(&numeric, "numeric", "A simple number.")
-        // Can insert into a list.
-        // Giving a positional argument to a list will span the rest of the arguments.
-        args.optionalNext(&list, "list", "Appends a number to a list.")
         // Can insert into a map.
         args.optional(&record, "record", "Sets a key-value pair to a record.").short('r')
         // And can insert into a map of a list.
         args.optional(&classifier, "classifier", "Appends a number to a list of a key.")
+        // Cutoff arguments, will be ignored and parsing will stop immediately, useful if you need to pass them to another program.
+        args.requiredCutoff(&cutoff, "cutoff");
 
         // Validates the arguments for you.
         // Automatically shows generated help if no mode is specified.
@@ -52,7 +52,7 @@ fn main() {
         // args.parse, to manually parse and retrieve the errors.
         printf("numeric: %v\n", numeric)
         printf("boolean: %v\n", boolean)
-        printf("list: %v\n", list)
+        printf("cutoff: %v\n", cutoff)
         printf("record: %v\n", record)
         printf("classifier: %v\n", classifier)
     } else {
@@ -80,18 +80,16 @@ Let's select the `test` mode:
 
 ```
 W:\umka-extras\args>umka example.um test --help
-Your program 1.0.0 - Here goes description of your program.
-
 Arguments:
-        --help -h                - Show this help message
-        --boolean -b             (default: true)
-        --numeric    <int>       - A simple number. (required)
-        --list       <str>       - Appends a number to a list.
-        --record -r  <key> <int> - Sets a key-value pair to a record.
-        --classifier <key> <int> - Appends a number to a list of a key.
+        --help, -h                - Show this help message
+        --boolean, -b             (default: true)
+        --numeric     <int>       - A simple number. (required)
+        --record, -r  <key> <int> - Sets a key-value pair to a record.
+        --classifier  <key> <int> - Appends a number to a list of a key.
+        --cutoff      <str>       (required)
 
 Format:
-        <numeric> [list...]
+        <numeric> : <cutoff...>
 ```
 
 It will gracefully handle the errors for you:
@@ -101,17 +99,18 @@ W:\umka-extras\args>umka example.um test
 Your program 1.0.0 - Here goes description of your program.
 
 Arguments:
-        --help -h                - Show this help message
-        --boolean -b             (default: true)
-        --numeric    <int>       - A simple number. (required)
-        --list       <str>       - Appends a number to a list.
-        --record -r  <key> <int> - Sets a key-value pair to a record.
-        --classifier <key> <int> - Appends a number to a list of a key.
+        --help, -h                - Show this help message
+        --boolean, -b             (default: true)
+        --numeric     <int>       - A simple number. (required)
+        --record, -r  <key> <int> - Sets a key-value pair to a record.
+        --classifier  <key> <int> - Appends a number to a list of a key.
+        --cutoff      <str>       (required)
 
 Format:
-        <numeric> [list...]
+        <numeric> : <cutoff...>
 
 Error: Missing argument for numeric
+Error: Need at least one argument for cutoff
 ```
 
 And more! Consult documentation for `args.um` for more information.
@@ -125,6 +124,7 @@ And more! Consult documentation for `args.um` for more information.
 * Positional arguments and list positional arguments.
 * Built-in help flag.
 * Supports for modes (commands).
+* Allows you to cutoff arguments, which stops parsing, useful for transferring arguments to another program.
 * Works on various types:
   - Booleans/Strings/Integers/Floats(Reals)
   - Maps (of Booleans/Strings/Integers/Floats(Reals)/Arrays)

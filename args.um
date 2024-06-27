@@ -16,6 +16,7 @@ type (
         occurences: int
         positional: bool
         shortname: char
+        cutoff: bool
     }
 
     Error* = struct {
@@ -176,8 +177,8 @@ fn (args: ^Args) mode*(name: str, desc: str = ""): bool {
     return false
 }
 
-fn (args: ^Args) arg(name: str, ptr: any, desc: str, required: bool, next: bool): ^Arg {
-    arg := &Arg{name: name, desc: desc, value: ptr, required: required, positional: next}
+fn (args: ^Args) arg(name: str, ptr: any, desc: str, required: bool, next: bool, cutoff: bool): ^Arg {
+    arg := &Arg{name: name, desc: desc, value: ptr, required: required, positional: next, cutoff: cutoff}
     args.args = append(args.args, arg)
     
     if next {
@@ -205,29 +206,45 @@ fn (args: ^Args) arg(name: str, ptr: any, desc: str, required: bool, next: bool)
 // Adds a required argument to the argument parser.
 fn (args: ^Args) required*(ptr: any, name: str, desc: str = ""): ^Arg {
 //~~
-    return args.arg(name, ptr, desc, true, false)
+    return args.arg(name, ptr, desc, true, false, false)
 }
 
 //~~fn args.optional
 // Adds an optional argument to the argument parser.
 fn (args: ^Args) optional*(ptr: any, name: str, desc: str = ""): ^Arg {
 //~~
-    return args.arg(name, ptr, desc, false, false)
+    return args.arg(name, ptr, desc, false, false, false)
 }
 
-//~~fn args.required
+//~~fn args.requiredNext
 // Adds a positional required argument to the argument parser.
 fn (args: ^Args) requiredNext*(ptr: any, name: str, desc: str = ""): ^Arg {
 //~~
-    return args.arg(name, ptr, desc, true, true)
+    return args.arg(name, ptr, desc, true, true, false)
 }
 
-//~~fn args.optional
+//~~fn args.optionalNext
 // Adds a positional optional argument to the argument parser.
 fn (args: ^Args) optionalNext*(ptr: any, name: str, desc: str = ""): ^Arg {
 //~~
-    return args.arg(name, ptr, desc, false, true)
+    return args.arg(name, ptr, desc, false, true, false)
 }
+
+//~~fn args.optionalCutoff
+// Allows you to capture arguments to pass them to another program.
+fn (args: ^Args) optionalCutoff*(ptr: any, name: str, desc: str = ""): ^Arg {
+//~~
+    return args.arg(name, ptr, desc, false, true, true)
+}
+
+//~~fn args.requiredCutoff
+// Allows you to capture arguments to pass them to another program.
+// Requires at least one argument.
+fn (args: ^Args) requiredCutoff*(ptr: any, name: str, desc: str = ""): ^Arg {
+//~~
+    return args.arg(name, ptr, desc, true, true, true)
+}
+
 
 //~~fn arg.short
 // Adds a short name to the argument.
@@ -396,6 +413,13 @@ fn (args: ^Args) parse*(): []Error {
                 positionalIndex++
             } else if args.listPositional != null {
                 i = args.listPositional.parsearg(argv, i, &errors)
+                if args.listPositional.cutoff {
+                    for i < len(argv) {
+                        args.listPositional.parsearg(argv, i, &errors)
+                        i++
+                    }
+                    break
+                }
             } else {    
                 errors = append(errors, Error{"Stray argument " + argv[i]})
                 i++
@@ -507,6 +531,10 @@ fn (args: ^Args) getusage*(): str {
                     result += sprintf("[%s] ", arg.name)
                 }
             }
+        }
+
+        if args.listPositional.cutoff {
+            result += ": "
         }
 
         if args.listPositional.required {
