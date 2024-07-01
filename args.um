@@ -149,7 +149,7 @@ fn mk*(programName: str, programVer: str, programDesc: str, args: []str): Args {
         programName: programName, 
         programVer: programVer,
         programDesc: programDesc,
-        sourceArgs: slice(args, 1) // skip the program name
+        sourceArgs: args
     }
 }
 
@@ -569,9 +569,9 @@ fn (args: ^Args) usage*() {
 // Returns the command line arguments.
 fn stdargv*(): []str {
 //~~
-    list := make([]str, std::argc())
+    list := make([]str, std::argc()-1)
 
-    for i := 0; i < std::argc(); i++ {
+    for i := 1; i < std::argc(); i++ {
         list[i] = std::argv(i)
     }
 
