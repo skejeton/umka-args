@@ -522,25 +522,25 @@ fn (args: ^Args) getusage*(): str {
     }
 
     if len(args.positional) > 0 || args.listPositional != null {
-        if len(args.positional) > 0 {
-            result += "\nFormat:\n\t"
-            for _, arg in args.positional {
-                if arg.required {
-                    result += sprintf("<%s> ", arg.name)
-                } else {
-                    result += sprintf("[%s] ", arg.name)
-                }
+        result += "\nFormat:\n\t"
+        for _, arg in args.positional {
+            if arg.required {
+                result += sprintf("<%s> ", arg.name)
+            } else {
+                result += sprintf("[%s] ", arg.name)
             }
         }
 
-        if args.listPositional.cutoff {
-            result += ": "
-        }
+        if args.listPositional != null {
+            if args.listPositional.cutoff {
+                result += ": "
+            }
 
-        if args.listPositional.required {
-            result += sprintf("<%s...>", args.listPositional.name)
-        } else {
-            result += sprintf("[%s...]", args.listPositional.name)
+            if args.listPositional.required {
+                result += sprintf("<%s...>", args.listPositional.name)
+            } else {
+                result += sprintf("[%s...]", args.listPositional.name)
+            }
         }
 
         result += "\n"
